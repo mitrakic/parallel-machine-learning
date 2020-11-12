@@ -22,6 +22,9 @@
 #include <stdexcept>
 #include <time.h>
 #include <cblas.h>
+#include <omp.h>
+
+#include <tbb/tick_count.h>
 using namespace std;
 
 int H1SIZE = 300;
@@ -129,6 +132,7 @@ void read_all_data(double* x_vals, int* t_vals, char* filename) {
 
 void ih1_forward_propagate(double* x, double* h1, double* weights, double* bias, int num_elements) {
     //Dot product x0 with weights and add bk to it.
+    #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < H1SIZE; k++) {
             double result = bias[k] + cblas_ddot(features, x + i * features, 1, weights + k * features, 1);
@@ -140,6 +144,7 @@ void ih1_forward_propagate(double* x, double* h1, double* weights, double* bias,
 
 void h1h2_forward_propagate(double* h1, double* h2, double* weights, double* bias, int num_elements) {
     //Dot product x0 with weights and add bk to it.
+    #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < H2SIZE; k++) {
             double result = bias[k] + cblas_ddot(H1SIZE, h1 + i * H1SIZE, 1, weights + k * H1SIZE, 1);
@@ -151,6 +156,7 @@ void h1h2_forward_propagate(double* h1, double* h2, double* weights, double* bia
 
 void h2o_forward_propagate(double* h2, double* y, double* weights, double* bias, int num_elements) {
     //Dot product x0 with weights and add bk to it.
+    #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < num_digits; k++) {
             double result = bias[k] + cblas_ddot(H2SIZE, h2 + i * H2SIZE, 1, weights + k * H2SIZE, 1);
@@ -164,6 +170,7 @@ void h2o_forward_propagate(double* h2, double* y, double* weights, double* bias,
 void ih1_backward_propagate(double* x, double* y,
                             double* delta1, double* weights, double* bias,
                             int num_elements, int epoch) {
+    #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < H1SIZE; k++) {
             double yk = y[i * H1SIZE + k];
@@ -178,6 +185,7 @@ void ih1_backward_propagate(double* x, double* y,
 void h1h2_backward_propagate(double* x, double* y,
                              double* delta2, double* delta1,
                              double* weights, double* bias, int num_elements, int epoch) {
+    #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < H2SIZE; k++) {
             double yk = y[i * H2SIZE + k];
@@ -196,6 +204,7 @@ void h2o_backward_propagate(double* x, double* y, int* true_vals,
                             double* delta2, double* weights, double* bias,
                             int num_elements, int epoch) {
     double* deltaout = (double*) malloc(num_digits * sizeof(double));
+    #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < num_digits; k++) {
             double yk = y[i * num_digits + k];
@@ -376,7 +385,7 @@ int main(int argc, const char * argv[])
     double* x_test = x + features * 50000;
     int* label_test = true_values + 50000;
     clock_t t1,t2,s1,e1;
-    t1 = clock();
+    tbb::tick_count tstart = tbb::tick_count::now();
     s1 = clock();
     int passes = 0;
     //finite_difference(true_values, x,
@@ -410,8 +419,9 @@ int main(int argc, const char * argv[])
             calculate_error(x_test, 10000, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, label_test));
     }
     t2 = clock();
+    tbb::tick_count tend = tbb::tick_count::now();
     double diff = (double) (t2 - t1) / CLOCKS_PER_SEC;
-    printf("Running time: %fs\n", diff);
+    printf("Running time: %fs\n", (tend-tstart).seconds());
     free(x);
     free(ih1weights);
     free(ih1bias);

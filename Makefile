@@ -10,5 +10,8 @@ neural: main.cpp
 multilayer: multilayer.cpp
 	 g++ -g -Ofast -o multilayer multilayer.cpp -lblas -lcblas
 
+multilayer_parallel: multilayer_parallel.cpp
+	 g++ -g -Ofast -o multilayer_parallel multilayer_parallel.cpp -fopenmp -lblas -lcblas
+
 clean:
 	rm -f *.o $(TARGETS)
