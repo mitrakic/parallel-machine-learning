@@ -36,7 +36,7 @@ double ETA = .01;
 
 int chunk_size = 50;
 int N = 1279;
-int epochs = 10;
+int epochs = 1000;
 
 void array_print(double* arr, int arrlen) {
     for (int i = 0; i < arrlen; i++) {
