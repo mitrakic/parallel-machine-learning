@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdexcept>
-#include <omp.h>
 #include <time.h>
 #include <cblas.h>
 using namespace std;
@@ -28,13 +27,13 @@ using namespace std;
 int H1SIZE = 300;
 int H2SIZE = 100;
 int num_digits = 10;
-int features = 784;
+int features = 11;
 double ETA = .01;
 
 
-int chunk_size = 200;
+int chunk_size = 50;
 int N = 50000;
-int epochs = 600;
+int epochs = 10;
 
 void array_print(double* arr, int arrlen) {
     for (int i = 0; i < arrlen; i++) {
@@ -113,17 +112,12 @@ void read_all_data(double* x_vals, int* t_vals, char* filename) {
         string token;
         int i = 0;
         while (getline(ss, token, ',')) {
-            char token_array[4];
-            token_array[0] = token[0];
-            token_array[1] = token[1];
-            token_array[2] = token[2];
-            token_array[3] = '\0';
             if (i == features) {
-                t_vals[k] = atoi(token_array);
+                t_vals[k] = stoi(token,nullptr);
                 i++;
                 k++;
             } else {
-                x_vals[j * features + i] = atof(token_array);
+                x_vals[j * features + i] = stof(token,nullptr);
                 i++;
             }
         }
@@ -375,7 +369,7 @@ int main(int argc, const char * argv[])
     double* h1 = (double*) calloc(chunk_size * H1SIZE, sizeof(double));
     double* h2 = (double*) calloc(chunk_size * H2SIZE, sizeof(double));
     double* y = (double*) malloc(sizeof(double) * chunk_size * num_digits);
-    char training_file[] = "../train-full.txt";
+    char training_file[] = "../winedata_training.csv";
     read_all_data(x, true_values, training_file);
     normalize_data(x, 60000, 1.0/255.0);
     shuffle_data(x, true_values, 60000);
