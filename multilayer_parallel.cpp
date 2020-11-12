@@ -35,7 +35,7 @@ double ETA = .01;
 
 
 int chunk_size = 50;
-int N = 50000;
+int N = 1279;
 int epochs = 10;
 
 void array_print(double* arr, int arrlen) {
@@ -129,13 +129,19 @@ void read_all_data(double* x_vals, int* t_vals, char* filename) {
     data.close();
     return;
 }
-
+double dot(int N, double* X, double* Y){
+    double sum = 0;
+    for (int i=0;i<N;i++){
+        sum+= X[i]*Y[i];
+    }
+    return sum;
+}
 void ih1_forward_propagate(double* x, double* h1, double* weights, double* bias, int num_elements) {
     //Dot product x0 with weights and add bk to it.
     #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < H1SIZE; k++) {
-            double result = bias[k] + cblas_ddot(features, x + i * features, 1, weights + k * features, 1);
+            double result = bias[k] + dot(features, x + i * features, weights + k * features);
             h1[i * H1SIZE + k] = mytanh(result);
         }
     }
@@ -147,7 +153,7 @@ void h1h2_forward_propagate(double* h1, double* h2, double* weights, double* bia
     #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < H2SIZE; k++) {
-            double result = bias[k] + cblas_ddot(H1SIZE, h1 + i * H1SIZE, 1, weights + k * H1SIZE, 1);
+            double result = bias[k] + dot(H1SIZE, h1 + i * H1SIZE, weights + k * H1SIZE);
             h2[i * H2SIZE + k] = mytanh(result);
         }
     }
@@ -159,7 +165,7 @@ void h2o_forward_propagate(double* h2, double* y, double* weights, double* bias,
     #pragma omp parallel for
     for (int i = 0; i < num_elements; i++) {
         for (int k = 0; k < num_digits; k++) {
-            double result = bias[k] + cblas_ddot(H2SIZE, h2 + i * H2SIZE, 1, weights + k * H2SIZE, 1);
+            double result = bias[k] + dot(H2SIZE, h2 + i * H2SIZE, weights + k * H2SIZE);
             y[i * num_digits + k] = sigmoid(result);
         }
     }
@@ -374,16 +380,21 @@ int main(int argc, const char * argv[])
 
     int* true_values = (int*) malloc(sizeof(int) * 60000);
     double* x = (double*) malloc(sizeof(double) * 60000 * features);
-
+    int* label_test = (int*) malloc(sizeof(int) * 320);
+    double* x_test = (double*) malloc(sizeof(double) * 320 * features);
     double* h1 = (double*) calloc(chunk_size * H1SIZE, sizeof(double));
     double* h2 = (double*) calloc(chunk_size * H2SIZE, sizeof(double));
     double* y = (double*) malloc(sizeof(double) * chunk_size * num_digits);
     char training_file[] = "./winedata_training copy.csv";
+    
     read_all_data(x, true_values, training_file);
+    
+    char test_file[] = "./winedata_test copy.csv";
+    read_all_data(x_test, label_test, test_file);
     normalize_data(x, 60000, 1.0/255.0);
     shuffle_data(x, true_values, 60000);
-    double* x_test = x + features * 50000;
-    int* label_test = true_values + 50000;
+    normalize_data(x_test, 320, 1.0/255.0);
+    shuffle_data(x_test, label_test, 320);
     clock_t t1,t2,s1,e1;
     tbb::tick_count tstart = tbb::tick_count::now();
     s1 = clock();
@@ -395,7 +406,7 @@ int main(int argc, const char * argv[])
     //printf("mse=%f\n", full_mse(x, true_values));
     printf("%d,%f,%f\n", 0,
         calculate_error(x, N, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, true_values),
-        calculate_error(x_test, 10000, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, label_test));
+        calculate_error(x_test, 320, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, label_test));
     for (int e = 1; e <= epochs; e++) {
         for (int i = 0; i < N; i += chunk_size) {
             ih1_forward_propagate(x + i * features, h1, ih1weights, ih1bias, chunk_size);
@@ -416,12 +427,13 @@ int main(int argc, const char * argv[])
         s1 = clock();
         printf("%d,%f,%f\n", e,
             calculate_error(x, N, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, true_values),
-            calculate_error(x_test, 10000, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, label_test));
+            calculate_error(x_test, 320, ih1weights, ih1bias, h1h2weights, h1h2bias, h2oweights, h2obias, label_test));
     }
     t2 = clock();
     tbb::tick_count tend = tbb::tick_count::now();
     double diff = (double) (t2 - t1) / CLOCKS_PER_SEC;
     printf("Running time: %fs\n", (tend-tstart).seconds());
+    
     free(x);
     free(ih1weights);
     free(ih1bias);
